@@ -7,6 +7,13 @@ import time
 import pytest
 
 
+def merge(x, *args):
+    z = x.copy()   # start with x's keys and values
+    for arg in args:
+        z.update(arg)    # modifies z with y's keys and values & returns None
+    return z
+
+
 class JSONReport:
     """The JSON report pytest plugin."""
 
@@ -102,6 +109,7 @@ class JSONReport:
         if outcome not in ['passed', '']:
             test['outcome'] = outcome
         test[call.when] = self.json_teststage(item, report)
+        self.config.hook.pytest_json_modifytest(item=item, call=call, test=test)
 
     def pytest_sessionfinish(self, session):
         self.add_metadata()
@@ -169,11 +177,10 @@ class JSONReport:
             'nodeid': report.nodeid,
             # This is the outcome of the collection, not the test outcome
             'outcome': report.outcome,
-            'children': [{
+            'children': [merge({
                 'nodeid': node.nodeid,
-                'type': node.__class__.__name__,
-                **self.json_location(node),
-            } for node in report.result],
+                'type': node.__class__.__name__
+            }, self.json_location(node)) for node in report.result],
         }
 
     def json_location(self, node):
@@ -190,27 +197,24 @@ class JSONReport:
 
     def json_testitem(self, item):
         """Return JSON-serializable test item."""
-        return {
+        return merge({
             'nodeid': item.nodeid,
             # Adding the location in the collector dict *and* here appears
             # redundant, but the docs say they may be different
-            **self.json_location(item),
             # item.keywords is actually a dict, but we just save the keys
             'keywords': list(item.keywords),
             # The outcome will be overridden in case of failure
             'outcome': 'passed',
-        }
+        }, self.json_location(item))
 
     def json_teststage(self, item, report):
         """Return JSON-serializable test stage (setup/call/teardown)."""
-        stage = {
+        stage = merge({
             'duration': report.duration,
             'outcome': report.outcome,
-            **self.json_crash(report),
-            **self.json_traceback(report),
-            **self.json_streams(item, report.when),
-            **self.json_log(item, report.when),
-        }
+        }, self.json_crash(report), self.json_traceback(report),
+           self.json_streams(item, report.when),
+           self.json_log(item, report.when))
         if report.longreprtext:
             stage['longrepr'] = report.longreprtext
         return stage
@@ -278,7 +282,7 @@ class JSONReport:
 class LoggingHandler(logging.Handler):
 
     def __init__(self):
-        super().__init__()
+        super(LoggingHandler, self).__init__()
         self.records = []
 
     def emit(self, record):
@@ -296,6 +300,12 @@ class Hooks:
         """Called after building JSON report and before saving it.
 
         Plugins can use this hook to modify the report before it's saved.
+        """
+
+    def pytest_json_modifytest(self, item, call, test):
+        """Called while adding a test to the report.
+
+        Plugins can use this hook to modify the result before it's saved.
         """
 
 
