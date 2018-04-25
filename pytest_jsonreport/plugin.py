@@ -237,6 +237,11 @@ class JSONReport:
         try:
             crash = report.longrepr.reprcrash
         except AttributeError:
+            # Skipped special case
+            if isinstance(report.longrepr, tuple):
+                return {
+                    'skip': report.longrepr
+                }
             return {}
         return {
             'crash': {
