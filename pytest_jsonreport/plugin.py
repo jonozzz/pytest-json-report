@@ -88,7 +88,8 @@ class JSONReportBase:
         # the details will be serialized and relayed with the other attributes
         # of the report.
         report._json_report_extra = item._json_report_extra
-        self._config.hook.pytest_json_modifytest(item=item, call=call, test=test)
+        self._config.hook.pytest_json_modifytest(item=item, call=call,
+                                                 test=item._json_report_extra)
 
     @staticmethod
     def _validate_metadata(item):
