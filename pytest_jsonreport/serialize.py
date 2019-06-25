@@ -63,6 +63,8 @@ def make_teststage(report, stdout, stderr, log, traceback):
         stage['log'] = log
     if report.longreprtext:
         stage['longrepr'] = report.longreprtext
+    if report.outcome == 'skipped':
+        stage['skip'] = report.longrepr
     return stage
 
 
