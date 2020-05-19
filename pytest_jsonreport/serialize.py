@@ -4,22 +4,8 @@
 from collections import Counter
 
 
-def make_collector(report):
+def make_collector(report, result):
     """Return JSON-serializable collector node."""
-    result = []
-    for item in report.result:
-        json_item = {
-            'nodeid': item.nodeid,
-            'type': item.__class__.__name__,
-        }
-        try:
-            location = item.location
-        except AttributeError:
-            pass
-        else:
-            json_item['lineno'] = location[1]
-        result.append(json_item)
-
     collector = {
         'nodeid': report.nodeid,
         # This is the outcome of the collection, not the test outcome
@@ -31,6 +17,21 @@ def make_collector(report):
         # add the message, but no traceback etc.
         collector['longrepr'] = str(report.longrepr)
     return collector
+
+
+def make_collectitem(item):
+    """Return JSON-serializable collection item."""
+    json_item = {
+        'nodeid': item.nodeid,
+        'type': item.__class__.__name__,
+    }
+    try:
+        location = item.location
+    except AttributeError:
+        pass
+    else:
+        json_item['lineno'] = location[1]
+    return json_item
 
 
 def make_testitem(nodeid, keywords, location):
@@ -92,10 +93,11 @@ def make_traceback(traceback):
     } for entry in traceback.reprentries]
 
 
-def make_summary(tests):
+def make_summary(tests, **kwargs):
     """Return JSON-serializable test result summary."""
     summary = Counter([t['outcome'] for t in tests.values()])
     summary['total'] = sum(summary.values())
+    summary.update(kwargs)
     return summary
 
 
@@ -103,6 +105,7 @@ def make_warning(warning_message, when):
     # warning_message is a warnings.WarningMessage object
     return {
         'message': str(warning_message.message),
+        'category': warning_message.category.__name__,
         'when': when,
         'filename': warning_message.filename,
         'lineno': warning_message.lineno

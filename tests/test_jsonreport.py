@@ -140,6 +140,7 @@ def test_report_summary(make_json):
         'xpassed': 1,
         'xfailed': 1,
         'error': 2,
+        'collected': 10,
     }
 
 
@@ -183,6 +184,21 @@ def test_report_crash_and_traceback(tests):
     if sys.version_info < (3,):
         del traceback[2]
     assert call['traceback'] == traceback
+
+
+def test_report_item_deselected(make_json):
+    data = make_json("""
+        import pytest
+        @pytest.mark.good
+        def test_first():
+            pass
+        @pytest.mark.bad
+        def test_second():
+            pass
+    """, ['--json-report', '-m', 'not bad'])
+    assert data['summary']['collected'] == 1
+    assert not data['collectors'][1]['result'][0].get('deselected')
+    assert data['collectors'][1]['result'][1].get('deselected')
 
 
 def test_no_traceback(make_json):
@@ -330,9 +346,7 @@ def test_runtest_metadata_hook(testdir, make_json):
     assert isinstance(test['metadata']['stop'], float)
 
 
-# TODO Investigate why no warnings are produced with multiple (4) processes
-@pytest.mark.xfail
-def test_warnings(make_json):
+def test_warnings(make_json, num_processes):
     warnings = make_json("""
         class TestFoo:
             def __init__(self):
@@ -340,10 +354,11 @@ def test_warnings(make_json):
             def test_foo(self):
                 assert True
     """)['warnings']
-    assert len(warnings) == 1
+    assert len(warnings) == max(1, num_processes)
     assert set(warnings[0]) == {
-        'filename', 'lineno', 'message', 'when'
+        'category', 'filename', 'lineno', 'message', 'when'
     }
+    assert warnings[0]['category'] == 'PytestCollectionWarning'
     assert warnings[0]['filename'].endswith('.py')
     assert warnings[0]['lineno'] == 1
     assert warnings[0]['when'] == 'collect'
@@ -490,6 +505,7 @@ def test_bug_31(make_json):
     assert set(data['summary'].items()) == {
         ('total', 2),
         ('passed', 2),
+        ('collected', 2),
     }
 
 
